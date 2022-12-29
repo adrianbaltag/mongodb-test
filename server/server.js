@@ -2,37 +2,9 @@ const express = require("express");
 const app = express();
 const mongoose = require("mongoose");
 mongoose.set("strictQuery", false);
+const fs = require("fs");
 const BlogModel = require("./models/Blogs");
-// const path = require("path");
-
-//multer-> helps with uploading files
-const multer = require("multer");
-
-const multerStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "../client/public/images");
-  },
-  filename: (req, file, cb) => {
-    const extension = file.mimetype.split("/")[1];
-    cb(null, `blog -$(req.blog.id) -$(Date.now()).${extension}`);
-  },
-});
-//test if upload fileis a img
-const multerFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith("image")) {
-    cb(null, true);
-  } else {
-    cb(err(alert("please upload an image file")), false);
-  }
-};
-
-//ceate storage for uploaded imgs(wont be storedin db, in db will be just a string reference to the img itself)
-const upload = multer({ storage: multerStorage, fileFilter: multerFilter });
-
-// const fse = require("fs-extra");
-//helps with resizing imgs
-// const sharp = require("sharp");
-
+const Image = require("./models/Image")
 //help with conn the backend with frontend
 const cors = require("cors");
 
@@ -46,6 +18,53 @@ mongoose.connect(
   "mongodb+srv://admin:adrian1@cluster0.wwkfbdl.mongodb.net/mongo_test?retryWrites=true&w=majority"
 );
 
+// const path = require("path");
+
+//multer-> helps with uploading files
+const multer = require("multer");
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads");
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + '-' +file.originalname);
+  },
+});
+
+const upload = multer({ storage: storage });
+
+app.post("/upload",upload.single('file'),function (req,res){
+
+
+    console.log("REQUEST");
+    console.log(req)
+  const saveImage =  Image({
+    _id: mongoose.Types.ObjectId(),
+   
+    img: {
+      data: fs.readFileSync("uploads/" + req.file.filename),
+      contentType: "image/png",
+    }})
+  return saveImage.save()
+  .then((newImage) => {
+        return res.status(201).json
+        ({
+          success: true, 
+          message: 'New image created successfully', 
+          Image: newImage
+          })
+                    }
+        )
+.catch((error) => {
+       return res.status(500).json({success: false, message: 'Server error. Please try again.', error: error.message});
+    });
+
+})
+
+
+
+
 //ge all blogs
 app.get("/getBlogs", (req, res) => {
   BlogModel.find({}, (err, result) => {
@@ -58,10 +77,12 @@ app.get("/getBlogs", (req, res) => {
   });
 });
 
+
+
 // const image = req.file;
 
 app.post("/createBlog", async (req, res) => {
-  console.log(req.file);
+
   console.log(req.body);
 
   const blog = req.body;
